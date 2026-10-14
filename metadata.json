@@ -1,0 +1,6 @@
+{
+  "name": "مترجم یوتیوب",
+  "description": "اپلیکیشن هوشمند ترجمه ویدیوها، زیرنویس‌ها و اصطلاحات یوتیوب از انگلیسی به فارسی همراه با خلاصه هوش مصنوعی و واژه‌نامه",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
