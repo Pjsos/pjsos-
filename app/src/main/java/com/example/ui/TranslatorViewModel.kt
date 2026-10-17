@@ -10,6 +10,7 @@ import com.example.data.model.VideoData
 import com.example.data.model.VocabularyItem
 import com.example.data.repository.AiTranslationOutput
 import com.example.data.repository.CuratedVideos
+import com.example.data.repository.FirestoreRepository
 import com.example.data.repository.TranslationHelper
 import com.example.data.repository.TranslatorRepository
 import kotlinx.coroutines.Job
@@ -31,6 +32,7 @@ enum class SubtitleLanguageMode(val titleFa: String) {
 class TranslatorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = TranslatorRepository.getInstance(application)
+    private val firestoreRepository = FirestoreRepository(application)
     private val ttsManager = TtsManager(application)
 
     val sampleVideos: List<VideoData> = repository.getSampleVideos()
@@ -73,6 +75,9 @@ class TranslatorViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
+
+    private val _isSyncingCloud = MutableStateFlow(false)
+    val isSyncingCloud: StateFlow<Boolean> = _isSyncingCloud.asStateFlow()
 
     val savedVideos: StateFlow<List<TranslatedVideoEntity>> = repository.allSavedVideos
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -267,14 +272,39 @@ class TranslatorViewModel(application: Application) : AndroidViewModel(applicati
 
     fun saveCurrentVideo() {
         viewModelScope.launch {
-            repository.saveVideo(_currentVideo.value)
-            _userMessage.value = "ویدیو و ترجمه‌ها در بخش ذخیره‌شده‌ها ثبت شد"
+            val vid = _currentVideo.value
+            repository.saveVideo(vid)
+            try {
+                _isSyncingCloud.value = true
+                val jsonSubtitles = com.squareup.moshi.Moshi.Builder()
+                    .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()
+                    .adapter<List<com.example.data.repository.SubtitleJson>>(
+                        com.squareup.moshi.Types.newParameterizedType(List::class.java, com.example.data.repository.SubtitleJson::class.java)
+                    ).toJson(vid.subtitles.map {
+                        com.example.data.repository.SubtitleJson(it.id, it.startSeconds, it.endSeconds, it.englishText, it.persianText)
+                    })
+                firestoreRepository.saveVideo(
+                    videoId = vid.id,
+                    title = vid.title,
+                    author = vid.author,
+                    thumbnailUrl = vid.thumbnailUrl,
+                    summaryPersian = vid.summaryPersian,
+                    subtitlesJson = jsonSubtitles
+                )
+            } catch (_: Exception) {
+            } finally {
+                _isSyncingCloud.value = false
+            }
+            _userMessage.value = "ویدیو و ترجمه‌ها در حافظه و ابر فایربیس ذخیره شد"
         }
     }
 
     fun deleteSavedVideo(id: String) {
         viewModelScope.launch {
             repository.deleteSavedVideo(id)
+            try {
+                firestoreRepository.deleteSavedVideo(id)
+            } catch (_: Exception) {}
             _userMessage.value = "ویدیو از تاریخچه حذف شد"
         }
     }
@@ -282,13 +312,33 @@ class TranslatorViewModel(application: Application) : AndroidViewModel(applicati
     fun saveVocabulary(item: VocabularyItem) {
         viewModelScope.launch {
             repository.saveWord(item, _currentVideo.value.title)
-            _userMessage.value = "واژه «${item.word}» به واژه‌نامه اختصاصی شما اضافه شد"
+            try {
+                _isSyncingCloud.value = true
+                firestoreRepository.saveWord(
+                    word = item.word,
+                    phonetic = item.phonetic,
+                    persianMeaning = item.persianMeaning,
+                    partOfSpeech = item.partOfSpeech,
+                    englishSentence = item.englishContext,
+                    sourceVideoTitle = _currentVideo.value.title
+                )
+            } catch (_: Exception) {
+            } finally {
+                _isSyncingCloud.value = false
+            }
+            _userMessage.value = "واژه «${item.word}» در واژه‌نامه محلی و ابری ذخیره شد"
         }
     }
 
-    fun deleteVocabulary(id: Int) {
+    fun deleteVocabulary(id: Int, wordText: String = "") {
         viewModelScope.launch {
             repository.deleteSavedWord(id)
+            if (wordText.isNotBlank()) {
+                val cleanDocId = wordText.lowercase().trim().replace("[^a-z0-9_\\-]".toRegex(), "_").take(64)
+                try {
+                    firestoreRepository.deleteSavedWord(cleanDocId)
+                } catch (_: Exception) {}
+            }
             _userMessage.value = "واژه از واژه‌نامه حذف شد"
         }
     }

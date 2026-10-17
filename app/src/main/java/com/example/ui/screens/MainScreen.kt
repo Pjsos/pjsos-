@@ -74,10 +74,18 @@ import com.example.ui.components.VideoSelectorRow
 import com.example.ui.components.YouTubePlayerView
 import com.example.ui.theme.YouTubeRed
 
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Person
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     viewModel: TranslatorViewModel,
+    onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentVideo by viewModel.currentVideo.collectAsStateWithLifecycle()
@@ -95,7 +103,9 @@ fun MainScreen(
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val savedVideos by viewModel.savedVideos.collectAsStateWithLifecycle()
     val savedWords by viewModel.savedWords.collectAsStateWithLifecycle()
+    val isSyncingCloud by viewModel.isSyncingCloud.collectAsStateWithLifecycle()
 
+    val currentUser = Firebase.auth.currentUser
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(userMessage) {
@@ -136,7 +146,7 @@ fun MainScreen(
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "انگلیسی به فارسی با هوش مصنوعی",
+                                    text = "متصل به فایربیس و ابر گوگل",
                                     fontSize = 11.sp,
                                     color = YouTubeRed,
                                     fontWeight = FontWeight.Medium
@@ -146,32 +156,43 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    // Badge indicating number of saved words
-                    if (savedWords.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.padding(end = 12.dp)
+                    // Cloud Sync Indicator
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Spellcheck,
-                                    contentDescription = null,
-                                    tint = YouTubeRed,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "${savedWords.size} واژه",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                            Icon(
+                                imageVector = if (isSyncingCloud) Icons.Default.CloudSync else Icons.Default.CloudDone,
+                                contentDescription = "وضعیت ابری",
+                                tint = if (isSyncingCloud) YouTubeRed else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isSyncingCloud) "همگام‌سازی..." else "فایربیس فعال",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
+                    }
+
+                    // Logout Action
+                    IconButton(
+                        onClick = onSignOut,
+                        modifier = Modifier.testTag("btn_logout")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "خروج از حساب",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -332,7 +353,7 @@ fun MainScreen(
                             }
                         },
                         onDeleteVideo = { viewModel.deleteSavedVideo(it) },
-                        onDeleteWord = { viewModel.deleteVocabulary(it) },
+                        onDeleteWord = { id, word -> viewModel.deleteVocabulary(id, word) },
                         onSpeakWord = { viewModel.speakEnglish(it) }
                     )
                 }

@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "SavedVideo": {
+      "title": "SavedVideo",
+      "description": "User saved and translated YouTube video with synced subtitles",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID"
+        },
+        "videoId": {
+          "type": "string",
+          "description": "YouTube 11-char Video ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Video Title"
+        },
+        "author": {
+          "type": "string",
+          "description": "Channel or Author Name"
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "Video Thumbnail URL"
+        },
+        "summaryPersian": {
+          "type": "string",
+          "description": "AI generated summary in Persian"
+        },
+        "subtitlesJson": {
+          "type": "string",
+          "description": "Serialized JSON array of subtitles with timestamps"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when saved"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when updated"
+        }
+      },
+      "required": ["userId", "videoId", "title", "author", "summaryPersian", "createdAt"]
+    },
+    "SavedWord": {
+      "title": "SavedWord",
+      "description": "User saved vocabulary word with Persian translation and phonetic",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID"
+        },
+        "word": {
+          "type": "string",
+          "description": "English word or phrase"
+        },
+        "phonetic": {
+          "type": "string",
+          "description": "Phonetic pronunciation"
+        },
+        "persianMeaning": {
+          "type": "string",
+          "description": "Persian translation / meaning"
+        },
+        "partOfSpeech": {
+          "type": "string",
+          "description": "Part of speech (noun, verb, etc.)"
+        },
+        "englishSentence": {
+          "type": "string",
+          "description": "Example context sentence in English"
+        },
+        "sourceVideoTitle": {
+          "type": "string",
+          "description": "Title of the video where word was learned"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when saved"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when updated"
+        }
+      },
+      "required": ["userId", "word", "persianMeaning", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/saved_videos/{videoId}": {
+      "schema": "SavedVideo",
+      "description": "Collection of saved translated videos per user"
+    },
+    "/users/{userId}/saved_words/{wordId}": {
+      "schema": "SavedWord",
+      "description": "Collection of saved vocabulary items per user"
+    }
+  }
+}

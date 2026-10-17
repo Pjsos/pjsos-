@@ -66,7 +66,7 @@ fun SavedHistoryTab(
     savedWords: List<SavedWordEntity>,
     onSelectVideoId: (String) -> Unit,
     onDeleteVideo: (String) -> Unit,
-    onDeleteWord: (Int) -> Unit,
+    onDeleteWord: (Int, String) -> Unit,
     onSpeakWord: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -160,7 +160,7 @@ fun SavedHistoryTab(
                                                 tint = ElectricCyan
                                             )
                                         }
-                                        IconButton(onClick = { onDeleteWord(word.id) }) {
+                                        IconButton(onClick = { onDeleteWord(word.id, word.word) }) {
                                             Icon(
                                                 imageVector = Icons.Default.DeleteOutline,
                                                 contentDescription = "حذف واژه",
