@@ -62,6 +62,15 @@ import com.example.ui.SubtitleLanguageMode
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.YouTubeRed
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.util.SubtitleExportHelper
+
 @Composable
 fun SubtitleView(
     subtitles: List<SubtitleLine>,
@@ -71,10 +80,58 @@ fun SubtitleView(
     onSeekTo: (Float) -> Unit,
     onSpeakEnglish: (String) -> Unit,
     onSaveVocabulary: (VocabularyItem) -> Unit,
+    videoTitle: String = "YouTube Video",
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
+
+    var showExportDialog by remember { mutableStateOf(false) }
+    var pendingExportFormat by remember { mutableStateOf<SubtitleExportHelper.ExportFormat?>(null) }
+
+    // Launcher for Android Storage Access Framework (SAF) to save file locally
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        if (uri != null && pendingExportFormat != null) {
+            val content = SubtitleExportHelper.generateContent(
+                format = pendingExportFormat!!,
+                videoTitle = videoTitle,
+                subtitles = subtitles
+            )
+            val success = SubtitleExportHelper.writeToFileUri(context, uri, content)
+            if (success) {
+                Toast.makeText(context, "فایل زیرنویس با موفقیت ذخیره شد", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "خطا در ذخیره فایل زیرنویس", Toast.LENGTH_LONG).show()
+            }
+            pendingExportFormat = null
+        }
+    }
+
+    if (showExportDialog) {
+        SubtitleExportDialog(
+            videoTitle = videoTitle,
+            onDismiss = { showExportDialog = false },
+            onSaveToFile = { format ->
+                pendingExportFormat = format
+                val cleanTitle = videoTitle
+                    .replace("[^a-zA-Z0-9آ-ی]".toRegex(), "_")
+                    .take(25)
+                    .ifEmpty { "subtitle" }
+                val suggestedFileName = "${cleanTitle}_translated.${format.extension}"
+                createDocumentLauncher.launch(suggestedFileName)
+            },
+            onShareDirectly = { format ->
+                SubtitleExportHelper.shareSubtitles(
+                    context = context,
+                    format = format,
+                    videoTitle = videoTitle,
+                    subtitles = subtitles
+                )
+            }
+        )
+    }
 
     // Find active subtitle index
     val activeIndex = subtitles.indexOfFirst {
@@ -89,7 +146,7 @@ fun SubtitleView(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // Language Mode Tabs Header
+        // Language Mode Tabs & Export Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -107,40 +164,73 @@ fun SubtitleView(
                 Spacer(modifier = Modifier.width(6.dp))
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     Text(
-                        text = "زیرنویس و ترجمه همزمان",
+                        text = "زیرنویس و ترجمه",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
 
-            // Mode Selector
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(2.dp)
-            ) {
-                SubtitleLanguageMode.values().forEach { mode ->
-                    val isSelected = languageMode == mode
-                    val label = when (mode) {
-                        SubtitleLanguageMode.DUAL -> "دو زبانه"
-                        SubtitleLanguageMode.PERSIAN_ONLY -> "فارسی"
-                        SubtitleLanguageMode.ENGLISH_ONLY -> "English"
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Export & Share Action Button
+                if (subtitles.isNotEmpty()) {
                     Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (isSelected) YouTubeRed else Color.Transparent,
-                        modifier = Modifier.clickable { onLanguageModeChange(mode) }
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .clickable { showExportDialog = true }
+                            .testTag("btn_export_subtitles")
                     ) {
-                        Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "خروجی و اشتراک زیرنویس",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "خروجی",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                // Mode Selector
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(2.dp)
+                ) {
+                    SubtitleLanguageMode.values().forEach { mode ->
+                        val isSelected = languageMode == mode
+                        val label = when (mode) {
+                            SubtitleLanguageMode.DUAL -> "دو زبانه"
+                            SubtitleLanguageMode.PERSIAN_ONLY -> "فارسی"
+                            SubtitleLanguageMode.ENGLISH_ONLY -> "English"
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (isSelected) YouTubeRed else Color.Transparent,
+                            modifier = Modifier.clickable { onLanguageModeChange(mode) }
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }

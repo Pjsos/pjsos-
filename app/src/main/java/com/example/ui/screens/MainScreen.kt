@@ -285,6 +285,7 @@ fun MainScreen(
                             onSeekTo = { viewModel.seekTo(it) },
                             onSpeakEnglish = { viewModel.speakEnglish(it) },
                             onSaveVocabulary = { viewModel.saveVocabulary(it) },
+                            videoTitle = currentVideo.title,
                             modifier = Modifier.weight(1f)
                         )
                     }
